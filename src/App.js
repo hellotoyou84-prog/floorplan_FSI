@@ -1119,7 +1119,7 @@ export default function App() {
         setDebugInfo("증거물 추가됨 (노란색)");
       });
     }
-    // 선택 모드
+    // 선택 모드 (개선된 객체 선택 로직)
     else {
       canvas.selection = true;
       canvas.isDrawingMode = false;
@@ -1140,7 +1140,7 @@ export default function App() {
       canvas.on("mouse:down", ({ target, e }) => {
         const pointer = canvas.getPointer(e);
         
-        // 더 정확한 겹친 객체 찾기
+        // 개선된 겹친 객체 찾기 로직
         const objectsAtPoint = [];
         
         // 모든 객체를 역순으로 확인 (위에 있는 객체부터)
@@ -1152,13 +1152,28 @@ export default function App() {
         });
         
         // 가이드라인은 제외
-        const validObjects = objectsAtPoint.filter(obj => !obj.isGuideline);
+        let validObjects = objectsAtPoint.filter(obj => !obj.isGuideline);
+        
+        // 탄화면적/그을음면적과 다른 객체가 겹쳐있는 경우 우선순위 조정
+        if (validObjects.length > 1) {
+          // 작은 객체 우선, path 객체(탄화면적/그을음면적) 후순위
+          validObjects.sort((a, b) => {
+            // path 객체는 우선순위 낮음
+            if (a.type === 'path' && b.type !== 'path') return 1;
+            if (b.type === 'path' && a.type !== 'path') return -1;
+            
+            // 크기가 작은 객체 우선
+            const aSize = (a.width || 0) * (a.height || 0);
+            const bSize = (b.width || 0) * (b.height || 0);
+            return aSize - bSize;
+          });
+        }
         
         if (validObjects.length > 0) {
           const currentActive = canvas.getActiveObject();
           let targetObject = validObjects[0];
           
-          // 여러 객체가 겹쳐있고 현재 선택된 객체가 있는 경우
+          // 여러 객체가 겹쳐있고 현재 선택된 객체가 있는 경우 순환 선택
           if (validObjects.length > 1 && currentActive) {
             const currentIndex = validObjects.indexOf(currentActive);
             if (currentIndex !== -1 && currentIndex < validObjects.length - 1) {
@@ -1170,7 +1185,22 @@ export default function App() {
           
           canvas.setActiveObject(targetObject);
           canvas.renderAll();
-          setDebugInfo(`선택됨: ${targetObject.type || '객체'} (${validObjects.length}개 겹침)`);
+          
+          // 객체 타입 정보 더 자세히 표시
+          let objectType = '객체';
+          if (targetObject.type === 'rect' && targetObject.height === 8) objectType = '벽';
+          else if (targetObject.type === 'rect' && targetObject.fill === '#ffffff') objectType = '문';
+          else if (targetObject.type === 'rect' && targetObject.strokeDashArray) objectType = '창문';
+          else if (targetObject.type === 'rect' && targetObject.fill === '#4CAF50') objectType = '콘센트';
+          else if (targetObject.type === 'rect' && targetObject.fill === '#9C27B0') objectType = '멀티탭';
+          else if (targetObject.type === 'rect' && targetObject.fill === '#000000') objectType = '차단기함';
+          else if (targetObject.type === 'rect' && targetObject.fill === '#FFEB3B') objectType = '증거물';
+          else if (targetObject.wireElement) objectType = '전선';
+          else if (targetObject.carbonizedArea) objectType = '탄화면적';
+          else if (targetObject.sootArea) objectType = '그을음면적';
+          else if (targetObject.type === 'group') objectType = '용융흔';
+          
+          setDebugInfo(`선택됨: ${objectType} (${validObjects.length}개 겹침)`);
         } else if (target) {
           canvas.setActiveObject(target);
           setDebugInfo(`선택됨: ${target.type || '객체'}`);
@@ -1194,7 +1224,7 @@ export default function App() {
       case 'carbonized': return '🔥 탄화면적 모드: 브러시로 탄화면적을 칠하세요';
       case 'soot': return '💨 그을음피해 모드: 브러시로 그을음피해를 칠하세요';
       case 'evidence': return '📋 증거물 모드: 클릭하여 증거물을 추가하세요';
-      default: return '↔️ 선택 모드: 객체를 선택하고 이동/크기 조절하세요';
+      default: return '↔️ 선택 모드: 객체를 선택하고 이동하세요 (범례 클릭으로 타입별 순환 선택)';
     }
   };
 
@@ -1256,6 +1286,97 @@ export default function App() {
     canvas.renderAll();
     setDebugInfo(`객체 ${direction === 'up' ? '위' : direction === 'down' ? '아래' : direction === 'left' ? '왼쪽' : '오른쪽'}로 이동`);
   };
+
+  // 타입별 객체 순환 선택 기능
+  const selectObjectsByType = (type) => {
+    const canvas = canvasObj.current;
+    if (!canvas) return;
+    
+    let targetObjects = [];
+    
+    // 타입별로 객체 필터링
+    canvas.getObjects().forEach(obj => {
+      switch(type) {
+        case 'wall':
+          if (obj.type === 'rect' && obj.height === 8 && !obj.carbonizedArea && !obj.sootArea) {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'door':
+          if (obj.type === 'rect' && obj.fill === '#ffffff' && obj.stroke === '#000000') {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'window':
+          if (obj.type === 'rect' && obj.fill === 'transparent' && obj.strokeDashArray) {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'outlet':
+          if (obj.type === 'rect' && obj.fill === '#4CAF50') {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'multitap':
+          if (obj.type === 'rect' && obj.fill === '#9C27B0') {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'breaker':
+          if (obj.type === 'rect' && obj.fill === '#000000' && obj.width === 24) {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'wire':
+          if (obj.wireElement) {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'burn':
+          if (obj.type === 'group') {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'carbonized':
+          if (obj.carbonizedArea) {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'soot':
+          if (obj.sootArea) {
+            targetObjects.push(obj);
+          }
+          break;
+        case 'evidence':
+          if (obj.type === 'rect' && obj.fill === '#FFEB3B') {
+            targetObjects.push(obj);
+          }
+          break;
+      }
+    });
+    
+    if (targetObjects.length === 0) {
+      setDebugInfo(`${type} 객체가 없습니다`);
+      return;
+    }
+    
+    // 현재 선택된 객체가 해당 타입인지 확인
+    const currentActive = canvas.getActiveObject();
+    let currentIndex = -1;
+    
+    if (currentActive) {
+      currentIndex = targetObjects.indexOf(currentActive);
+    }
+    
+    // 다음 객체 선택 (순환)
+    const nextIndex = (currentIndex + 1) % targetObjects.length;
+    const nextObject = targetObjects[nextIndex];
+    
+    canvas.setActiveObject(nextObject);
+    canvas.renderAll();
+    
+    setDebugInfo(`${type} 객체 ${nextIndex + 1}/${targetObjects.length} 선택됨`);
+  };
   const deleteSelected = () => {
     const canvas = canvasObj.current;
     if (!canvas) return;
@@ -1275,7 +1396,7 @@ export default function App() {
     }
   };
 
-  // 저장 함수 (범례 크기 조정)
+  // 저장 함수 (범례를 캔버스 크기에 맞춤)
   const saveProject = () => {
     const canvas = canvasObj.current;
     if (!canvas) return;
@@ -1286,8 +1407,8 @@ export default function App() {
     // 임시 캔버스 생성 (원본 + 범례)
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = Math.max(canvasWidth, 600); // 범례를 위한 최소 너비 줄임
-    tempCanvas.height = canvasHeight + 80; // 범례 공간 줄임
+    tempCanvas.width = canvasWidth; // 캔버스 크기에 맞춤
+    tempCanvas.height = canvasHeight + 80; // 범례 공간
     
     // 원본 캔버스 내용 복사
     const originalData = canvas.toDataURL();
@@ -1297,62 +1418,74 @@ export default function App() {
       // 원본 캔버스 그리기
       tempCtx.drawImage(img, 0, 0);
       
-      // 범례 배경
+      // 범례 배경 (캔버스 너비에 맞춤)
       tempCtx.fillStyle = '#ffffff';
-      tempCtx.fillRect(0, canvasHeight, tempCanvas.width, 80);
+      tempCtx.fillRect(0, canvasHeight, canvasWidth, 80);
       tempCtx.strokeStyle = '#333333';
       tempCtx.lineWidth = 1;
-      tempCtx.strokeRect(0, canvasHeight, tempCanvas.width, 80);
+      tempCtx.strokeRect(0, canvasHeight, canvasWidth, 80);
       
       // 범례 제목
       tempCtx.fillStyle = '#000000';
       tempCtx.font = 'bold 12px Arial';
       tempCtx.fillText('범례 (Legend)', 15, canvasHeight + 18);
       
-      // 범례 항목들 (크기와 간격 조정)
+      // 캔버스 너비에 따라 범례 항목 배치 조정
+      const itemWidth = Math.max(50, canvasWidth / 12); // 항목당 최소 50px, 최대 캔버스너비/12
+      
       const legendItems = [
-        { color: '#888888', text: '벽', x: 15, y: canvasHeight + 35 },
-        { color: '#ffffff', text: '문', x: 80, y: canvasHeight + 35, hasStroke: true },
-        { color: 'transparent', text: '창문', x: 130, y: canvasHeight + 35, isWindow: true },
-        { color: '#4CAF50', text: '콘센트', x: 190, y: canvasHeight + 35 },
-        { color: '#9C27B0', text: '멀티탭', x: 250, y: canvasHeight + 35 },
-        { color: '#000000', text: '차단기함', x: 310, y: canvasHeight + 35 },
-        { color: '#0066cc', text: '전선', x: 15, y: canvasHeight + 55 },
-        { color: '#ff0000', text: '용융흔', x: 70, y: canvasHeight + 55 },
-        { color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', x: 130, y: canvasHeight + 55 },
-        { color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', x: 190, y: canvasHeight + 55 },
-        { color: '#FFEB3B', text: '증거물', x: 260, y: canvasHeight + 55 },
+        { color: '#888888', text: '벽', index: 0 },
+        { color: '#ffffff', text: '문', index: 1, hasStroke: true },
+        { color: 'transparent', text: '창문', index: 2, isWindow: true },
+        { color: '#4CAF50', text: '콘센트', index: 3 },
+        { color: '#9C27B0', text: '멀티탭', index: 4 },
+        { color: '#000000', text: '차단기함', index: 5 },
+        { color: '#0066cc', text: '전선', index: 6 },
+        { color: '#ff0000', text: '용융흔', index: 7 },
+        { color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', index: 8 },
+        { color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', index: 9 },
+        { color: '#FFEB3B', text: '증거물', index: 10 },
       ];
       
       legendItems.forEach(item => {
-        // 색상 박스 그리기 (크기 줄임)
+        const row = Math.floor(item.index / 6); // 6개씩 2줄로 배치
+        const col = item.index % 6;
+        const x = 15 + col * itemWidth;
+        const y = canvasHeight + 35 + row * 20;
+        
+        // 텍스트가 캔버스를 벗어나지 않도록 체크
+        if (x + itemWidth > canvasWidth - 10) return;
+        
+        // 색상 박스 그리기
         if (item.isWindow) {
           // 창문은 점선으로
           tempCtx.strokeStyle = '#666666';
           tempCtx.setLineDash([2, 2]);
-          tempCtx.strokeRect(item.x, item.y - 8, 10, 8);
+          tempCtx.strokeRect(x, y - 8, 10, 8);
           tempCtx.setLineDash([]);
         } else {
           tempCtx.fillStyle = item.color;
-          tempCtx.fillRect(item.x, item.y - 8, 10, 8);
+          tempCtx.fillRect(x, y - 8, 10, 8);
           if (item.hasStroke) {
             tempCtx.strokeStyle = item.strokeColor || '#000000';
-            tempCtx.strokeRect(item.x, item.y - 8, 10, 8);
+            tempCtx.strokeRect(x, y - 8, 10, 8);
           }
         }
         
-        // 텍스트 (폰트 크기 줄임)
+        // 텍스트
         tempCtx.fillStyle = '#000000';
-        tempCtx.font = '9px Arial';
-        tempCtx.fillText(item.text, item.x + 14, item.y);
+        tempCtx.font = '8px Arial';
+        tempCtx.fillText(item.text, x + 14, y);
       });
       
-      // 저장 정보 (폰트 크기와 위치 조정)
+      // 저장 정보
       tempCtx.font = '8px Arial';
       tempCtx.fillStyle = '#666666';
       const date = new Date().toLocaleString('ko-KR');
       tempCtx.fillText(`생성일시: ${date}`, 15, canvasHeight + 75);
-      tempCtx.fillText(`화재조사 평면도 - 캔버스 크기: ${canvasWidth}×${canvasHeight}`, 200, canvasHeight + 75);
+      if (canvasWidth > 300) {
+        tempCtx.fillText(`화재조사 평면도 - 캔버스 크기: ${canvasWidth}×${canvasHeight}`, Math.min(200, canvasWidth - 180), canvasHeight + 75);
+      }
       
       // 다운로드
       const dataURL = tempCanvas.toDataURL('png', 1);
@@ -1482,81 +1615,160 @@ export default function App() {
         />
       </div>
       
-      {/* 객체 미세 이동 버튼들 */}
-      <div style={{ 
-        marginTop: 12, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center', 
-        gap: '4px' 
+      {/* 하단 영역: 범례(좌측) + 방향키(우측) */}
+      <div style={{
+        marginTop: 12,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: '20px',
+        flexWrap: isMobile ? 'wrap' : 'nowrap'
       }}>
-        <div style={{ fontSize: isMobile ? '12px' : '14px', fontWeight: 'bold', marginBottom: '8px' }}>
-          선택된 객체 미세 이동
+        
+        {/* 클릭 가능한 범례 (좌측) */}
+        <div style={{
+          flex: '1',
+          minWidth: isMobile ? '100%' : '300px',
+          maxWidth: isMobile ? '100%' : '400px'
+        }}>
+          <div style={{ 
+            fontSize: isMobile ? '11px' : '13px', 
+            fontWeight: 'bold', 
+            marginBottom: '8px',
+            color: '#333'
+          }}>
+            📋 범례 (클릭하여 객체 선택)
+          </div>
+          
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)',
+            gap: '4px',
+            fontSize: isMobile ? '9px' : '10px'
+          }}>
+            {[
+              { type: 'wall', color: '#888888', text: '벽', onClick: () => selectObjectsByType('wall') },
+              { type: 'door', color: '#ffffff', text: '문', hasStroke: true, onClick: () => selectObjectsByType('door') },
+              { type: 'window', color: 'transparent', text: '창문', isWindow: true, onClick: () => selectObjectsByType('window') },
+              { type: 'outlet', color: '#4CAF50', text: '콘센트', onClick: () => selectObjectsByType('outlet') },
+              { type: 'multitap', color: '#9C27B0', text: '멀티탭', onClick: () => selectObjectsByType('multitap') },
+              { type: 'breaker', color: '#000000', text: '차단기함', onClick: () => selectObjectsByType('breaker') },
+              { type: 'wire', color: '#0066cc', text: '전선', onClick: () => selectObjectsByType('wire') },
+              { type: 'burn', color: '#ff0000', text: '용융흔', onClick: () => selectObjectsByType('burn') },
+              { type: 'carbonized', color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', onClick: () => selectObjectsByType('carbonized') },
+              { type: 'soot', color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', onClick: () => selectObjectsByType('soot') },
+              { type: 'evidence', color: '#FFEB3B', text: '증거물', onClick: () => selectObjectsByType('evidence') },
+            ].map((item, index) => (
+              <button
+                key={index}
+                onClick={item.onClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 6px',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  background: '#f9f9f9',
+                  cursor: 'pointer',
+                  fontSize: 'inherit',
+                  minHeight: '24px'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#e3f2fd'}
+                onMouseOut={(e) => e.target.style.background = '#f9f9f9'}
+              >
+                <div
+                  style={{
+                    width: '12px',
+                    height: '8px',
+                    backgroundColor: item.isWindow ? 'transparent' : item.color,
+                    border: item.hasStroke || item.isWindow ? '1px solid #666' : item.color === 'transparent' ? '1px solid #ddd' : 'none',
+                    borderStyle: item.isWindow ? 'dashed' : 'solid',
+                    flexShrink: 0
+                  }}
+                />
+                <span style={{ whiteSpace: 'nowrap' }}>{item.text}</span>
+              </button>
+            ))}
+          </div>
         </div>
         
-        {/* 위쪽 버튼 */}
-        <button 
-          onClick={() => moveSelectedObject('up')}
-          style={{ 
-            padding: '6px 12px', 
-            background: '#2196F3', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            fontSize: isMobile ? '12px' : '14px',
-            cursor: 'pointer'
-          }}
-        >
-          ↑ 위
-        </button>
-        
-        {/* 좌우 버튼 */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* 객체 미세 이동 버튼들 (우측) */}
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          gap: '4px',
+          minWidth: isMobile ? '100%' : '120px'
+        }}>
+          <div style={{ fontSize: isMobile ? '11px' : '13px', fontWeight: 'bold', marginBottom: '8px' }}>
+            🎯 미세 이동
+          </div>
+          
+          {/* 위쪽 버튼 */}
           <button 
-            onClick={() => moveSelectedObject('left')}
+            onClick={() => moveSelectedObject('up')}
             style={{ 
               padding: '6px 12px', 
               background: '#2196F3', 
               color: 'white', 
               border: 'none', 
               borderRadius: '4px',
-              fontSize: isMobile ? '12px' : '14px',
+              fontSize: isMobile ? '11px' : '12px',
               cursor: 'pointer'
             }}
           >
-            ← 왼쪽
+            ↑ 위
           </button>
+          
+          {/* 좌우 버튼 */}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => moveSelectedObject('left')}
+              style={{ 
+                padding: '6px 12px', 
+                background: '#2196F3', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '4px',
+                fontSize: isMobile ? '11px' : '12px',
+                cursor: 'pointer'
+              }}
+            >
+              ← 왼쪽
+            </button>
+            <button 
+              onClick={() => moveSelectedObject('right')}
+              style={{ 
+                padding: '6px 12px', 
+                background: '#2196F3', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '4px',
+                fontSize: isMobile ? '11px' : '12px',
+                cursor: 'pointer'
+              }}
+            >
+              오른쪽 →
+            </button>
+          </div>
+          
+          {/* 아래쪽 버튼 */}
           <button 
-            onClick={() => moveSelectedObject('right')}
+            onClick={() => moveSelectedObject('down')}
             style={{ 
               padding: '6px 12px', 
               background: '#2196F3', 
               color: 'white', 
               border: 'none', 
               borderRadius: '4px',
-              fontSize: isMobile ? '12px' : '14px',
+              fontSize: isMobile ? '11px' : '12px',
               cursor: 'pointer'
             }}
           >
-            오른쪽 →
+            ↓ 아래
           </button>
         </div>
-        
-        {/* 아래쪽 버튼 */}
-        <button 
-          onClick={() => moveSelectedObject('down')}
-          style={{ 
-            padding: '6px 12px', 
-            background: '#2196F3', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            fontSize: isMobile ? '12px' : '14px',
-            cursor: 'pointer'
-          }}
-        >
-          ↓ 아래
-        </button>
       </div>
       {debugInfo && (
         <div style={{ 
