@@ -1485,7 +1485,7 @@ export default function App() {
         // 텍스트
         tempCtx.fillStyle = '#000000';
         tempCtx.font = `${12 * scaleFactor}px Arial`;
-        tempCtx.fillText(item.text, (x + 16) * scaleFactor, y);
+        tempCtx.fillText(item.text, x + 16 * scaleFactor, y);
       });
       
       // 다운로드
