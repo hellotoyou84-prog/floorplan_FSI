@@ -1404,37 +1404,44 @@ export default function App() {
     const canvasWidth = canvas.width;
     const canvasHeight = canvas.height;
     
+    // 해상도 스케일 팩터 (2배 = 2x 해상도, 3배 = 3x 해상도)
+    const scaleFactor = 4; // 이 값을 2, 3, 4 등으로 조정하여 해상도 변경
+
     // 임시 캔버스 생성 (원본 + 범례)
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = canvasWidth; // 캔버스 크기에 맞춤
-    tempCanvas.height = canvasHeight + 100; // 범례 공간
+    tempCanvas.width = canvasWidth * scaleFactor; // 캔버스 크기에 맞춤
+    tempCanvas.height = (canvasHeight + 100) * scaleFactor; // 범례 공간
     
+    // 고품질 렌더링 설정
+    tempCtx.imageSmoothingEnabled = true;
+    tempCtx.imageSmoothingQuality = 'high';
+
     // 원본 캔버스 내용 복사
     const originalData = canvas.toDataURL();
     const img = new Image();
     
     img.onload = () => {
       // 원본 캔버스 그리기
-      tempCtx.drawImage(img, 0, 0);
+      tempCtx.drawImage(img, 0, 0, canvasWidth * scaleFactor, canvasHeight * scaleFactor);
       
       // 날짜 변수 선언 (함수 시작 부분에 한 번만)
       const date = new Date().toLocaleString('ko-KR');
 
       // 범례 배경 (캔버스 너비에 맞춤)
       tempCtx.fillStyle = '#ffffff';
-      tempCtx.fillRect(0, canvasHeight, canvasWidth, 100);
+      tempCtx.fillRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, 100 * scaleFactor);
       tempCtx.strokeStyle = '#333333';
       tempCtx.lineWidth = 1;
-      tempCtx.strokeRect(0, canvasHeight, canvasWidth, 100);
+      tempCtx.strokeRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, 100 * scaleFactor);
       
       // 범례 제목
       tempCtx.fillStyle = '#000000';
-      tempCtx.font = 'bold 12px Arial';
-      tempCtx.fillText(`범례 (Legend) - 생성일시: ${date}`, 15, canvasHeight + 18);
+      tempCtx.font = 'bold ${12 * scaleFactor}px Arial';
+      tempCtx.fillText(`범례 (Legend) - 생성일시: ${date}`, 15 * scaleFactor, (canvasHeight + 18) * scaleFactor);
       
       // 캔버스 너비에 따라 범례 항목 배치 조정
-      const itemWidth = Math.max(60, canvasWidth / 5); // 항목당 최소 50px, 최대 캔버스너비/12
+      const itemWidth = Math.max(60, canvasWidth / 5) * scaleFactor; // 항목당 최소 50px, 최대 캔버스너비/12
       
       const legendItems = [
         { color: '#888888', text: '벽', index: 0 },
@@ -1453,36 +1460,36 @@ export default function App() {
       legendItems.forEach(item => {
         const row = Math.floor(item.index / 4); // 6개씩 2줄로 배치
         const col = item.index % 4;
-        const x = 15 + col * itemWidth;
-        const y = canvasHeight + 35 + row * 20;
+        const x = (15 + col * (itemWidth / scaleFactor)) * scaleFactor;
+        const y = (canvasHeight + 35 + row * 20) * scaleFactor;
         
         // 텍스트가 캔버스를 벗어나지 않도록 체크
-        if (x + itemWidth > canvasWidth - 10) return;
+        if (x + itemWidth > canvasWidth * scaleFactor - 10 * scaleFactor) return;
         
         // 색상 박스 그리기
         if (item.isWindow) {
           // 창문은 점선으로
           tempCtx.strokeStyle = '#666666';
-          tempCtx.setLineDash([2, 2]);
-          tempCtx.strokeRect(x, y - 8, 12, 10);
+          tempCtx.setLineDash([2 * scaleFactor, 2 * scaleFactor]);
+          tempCtx.strokeRect(x, y - 8 * scaleFactor, 12 * scaleFactor, 10 * scaleFactor);
           tempCtx.setLineDash([]);
         } else {
           tempCtx.fillStyle = item.color;
-          tempCtx.fillRect(x, y - 8, 12, 10);
+          tempCtx.fillRect(x, y - 8 * scaleFactor, 12 * scaleFactor, 10 * scaleFactor);
           if (item.hasStroke) {
             tempCtx.strokeStyle = item.strokeColor || '#000000';
-            tempCtx.strokeRect(x, y - 8, 12, 10);
+            tempCtx.strokeRect(x, y - 8 * scaleFactor, 12 * scaleFactor, 10 * scaleFactor);
           }
         }
         
         // 텍스트
         tempCtx.fillStyle = '#000000';
-        tempCtx.font = '12px Arial';
-        tempCtx.fillText(item.text, x + 16, y);
+        tempCtx.font = '${12 * scaleFactor}px Arial';
+        tempCtx.fillText(item.text, (x + 16) * scaleFactor, y);
       });
       
       // 다운로드
-      const dataURL = tempCanvas.toDataURL('png', 1);
+      const dataURL = tempCanvas.toDataURL('image/png', 1.0);
       const link = document.createElement('a');
       link.download = `화재조사_평면도_${new Date().toISOString().slice(0, 10)}.png`;
       link.href = dataURL;
