@@ -574,7 +574,7 @@ export default function App() {
         tempWalls = [];
       });
     }
-    // 문 추가 (드래그로 길이 조정) - 개선된 벽 방향 판단
+    // 문 추가 (벽에서만 생성) - 개선된 벽 방향 판단
     else if (mode === "door") {
       canvas.selection = false;
       
@@ -607,7 +607,7 @@ export default function App() {
         const { e, target } = opt;
         const { x, y } = canvas.getPointer(e);
         
-        // 벽 클릭 시 - 드래그로 길이 조정
+        // 벽 클릭 시에만 문 생성
         if (target && target.type === "rect" && target.height === 8) {
           drawing = true;
           startPos = { x, y };
@@ -643,32 +643,9 @@ export default function App() {
           
           canvas.add(tempDoor);
           canvas.renderAll();
-        }
-        // 빈 공간 클릭 시 - 드래그로 길이 조정
-        else if (!target) {
-          drawing = true;
-          startPos = { x, y };
-          wallTarget = null;
-          
-          tempDoor = new fabric.Rect({
-            left: x,
-            top: y,
-            width: 20,
-            height: 12,
-            angle: 0,
-            fill: '#ffffff',
-            stroke: '#000000',
-            strokeWidth: 2,
-            rx: 3,
-            ry: 3,
-            selectable: false,
-            evented: false,
-            originX: 'left',
-            originY: 'top',
-          });
-          
-          canvas.add(tempDoor);
-          canvas.renderAll();
+        } else {
+          // 벽이 아닌 곳 클릭 시 안내 메시지
+          setDebugInfo("⚠️ 벽을 클릭해야 문을 생성할 수 있습니다!");
         }
       });
       
@@ -708,18 +685,6 @@ export default function App() {
               left: Math.min(startPos.x, x)
             });
           }
-        } else {
-          // 빈 공간에서는 가로 길이 조정
-          const width = Math.abs(x - startPos.x);
-          const minWidth = 15;
-          const maxWidth = 80;
-          const finalWidth = Math.min(Math.max(width, minWidth), maxWidth);
-          
-          tempDoor.set({
-            width: finalWidth,
-            height: 12,
-            left: Math.min(startPos.x, x)
-          });
         }
         
         canvas.renderAll();
@@ -744,7 +709,7 @@ export default function App() {
         tempDoor = null;
       });
     }
-    // 창문 추가 (드래그로 길이 조정) - 개선된 벽 방향 판단
+    // 창문 추가 (벽에서만 생성) - 개선된 벽 방향 판단
     else if (mode === "window") {
       canvas.selection = false;
       
@@ -768,6 +733,7 @@ export default function App() {
         const { e, target } = opt;
         const { x, y } = canvas.getPointer(e);
         
+        // 벽 클릭 시에만 창문 생성
         if (target && target.type === "rect" && target.height === 8) {
           drawing = true;
           startPos = { x, y };
@@ -804,32 +770,9 @@ export default function App() {
           
           canvas.add(tempWindow);
           canvas.renderAll();
-        }
-        else if (!target) {
-          drawing = true;
-          startPos = { x, y };
-          wallTarget = null;
-          
-          tempWindow = new fabric.Rect({
-            left: x,
-            top: y,
-            width: 20,
-            height: 8,
-            angle: 0,
-            fill: 'transparent',
-            stroke: '#666666',
-            strokeWidth: 2,
-            strokeDashArray: [5, 5],
-            rx: 2,
-            ry: 2,
-            selectable: false,
-            evented: false,
-            originX: 'left',
-            originY: 'top',
-          });
-          
-          canvas.add(tempWindow);
-          canvas.renderAll();
+        } else {
+          // 벽이 아닌 곳 클릭 시 안내 메시지
+          setDebugInfo("⚠️ 벽을 클릭해야 창문을 생성할 수 있습니다!");
         }
       });
       
@@ -869,18 +812,6 @@ export default function App() {
               left: Math.min(startPos.x, x)
             });
           }
-        } else {
-          // 빈 공간에서는 가로 길이 조정
-          const width = Math.abs(x - startPos.x);
-          const minWidth = 15;
-          const maxWidth = 100;
-          const finalWidth = Math.min(Math.max(width, minWidth), maxWidth);
-          
-          tempWindow.set({
-            width: finalWidth,
-            height: 8,
-            left: Math.min(startPos.x, x)
-          });
         }
         
         canvas.renderAll();
@@ -992,7 +923,7 @@ export default function App() {
         setDebugInfo("차단기함 추가됨 (검은색)");
       });
     }
-    // 용융흔 추가 (X자 모양)
+    // 용융흔 추가 (X자 모양 + 검은 테두리)
     else if (mode === "burn") {
       canvas.selection = false;
       canvas.getObjects().forEach(obj => obj.set({ selectable: false, evented: false }));
@@ -1019,7 +950,25 @@ export default function App() {
           evented: false,
         });
         
-        const burnMark = new fabric.Group([line1, line2], {
+        // 검은 테두리를 위한 더 굵은 선들
+        const borderLine1 = new fabric.Line([x-8, y-8, x+8, y+8], {
+          stroke: '#000000',
+          strokeWidth: 5,
+          originX: 'center',
+          originY: 'center',
+          selectable: false,
+          evented: false,
+        });
+        const borderLine2 = new fabric.Line([x-8, y+8, x+8, y-8], {
+          stroke: '#000000',
+          strokeWidth: 5,
+          originX: 'center',
+          originY: 'center',
+          selectable: false,
+          evented: false,
+        });
+        
+        const burnMark = new fabric.Group([borderLine1, borderLine2, line1, line2], {
           left: x,
           top: y,
           originX: 'center',
@@ -1030,7 +979,7 @@ export default function App() {
         
         canvas.add(burnMark);
         canvas.renderAll();
-        setDebugInfo("용융흔 추가됨");
+        setDebugInfo("용융흔 추가됨 (검은 테두리)");
       });
     }
     // 자유선 그리기 (전선)
@@ -1103,7 +1052,7 @@ export default function App() {
       canvas.off('path:created');
       canvas.isDrawingMode = true;
       canvas.freeDrawingBrush.width = 20;
-      canvas.freeDrawingBrush.color = 'rgba(204, 0, 0, 0.7)'; // 더 빨간색, 투명도 증가
+      canvas.freeDrawingBrush.color = 'rgba(204, 0, 0, 0.4)'; // 더 빨간색, 투명도 증가
       
       canvas.on('path:created', (e) => {
         const path = e.path;
@@ -1179,7 +1128,11 @@ export default function App() {
       canvas.getObjects().forEach(obj => {
         obj.set({
           selectable: true,
-          evented: true
+          evented: true,
+          // 크기 조절 및 회전 잠금
+          lockScalingX: true,
+          lockScalingY: true,
+          lockRotation: true,
         });
       });
       canvas.requestRenderAll();
@@ -1264,7 +1217,45 @@ export default function App() {
     canvas.renderAll();
   }, [showWires, showCarbonized, showSoot]);
 
-  // 삭제 함수
+  // 선택된 객체 미세 이동 함수들
+  const moveSelectedObject = (direction) => {
+    const canvas = canvasObj.current;
+    if (!canvas) return;
+    
+    const activeObject = canvas.getActiveObject();
+    if (!activeObject) {
+      setDebugInfo("이동할 객체를 먼저 선택해주세요");
+      return;
+    }
+    
+    const moveDistance = 1; // 1픽셀씩 이동
+    let newLeft = activeObject.left;
+    let newTop = activeObject.top;
+    
+    switch(direction) {
+      case 'up':
+        newTop -= moveDistance;
+        break;
+      case 'down':
+        newTop += moveDistance;
+        break;
+      case 'left':
+        newLeft -= moveDistance;
+        break;
+      case 'right':
+        newLeft += moveDistance;
+        break;
+    }
+    
+    activeObject.set({
+      left: newLeft,
+      top: newTop
+    });
+    
+    activeObject.setCoords();
+    canvas.renderAll();
+    setDebugInfo(`객체 ${direction === 'up' ? '위' : direction === 'down' ? '아래' : direction === 'left' ? '왼쪽' : '오른쪽'}로 이동`);
+  };
   const deleteSelected = () => {
     const canvas = canvasObj.current;
     if (!canvas) return;
@@ -1284,7 +1275,7 @@ export default function App() {
     }
   };
 
-  // 저장 함수 (범례 포함)
+  // 저장 함수 (범례 크기 조정)
   const saveProject = () => {
     const canvas = canvasObj.current;
     if (!canvas) return;
@@ -1295,8 +1286,8 @@ export default function App() {
     // 임시 캔버스 생성 (원본 + 범례)
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = Math.max(canvasWidth, 800); // 범례를 위한 최소 너비
-    tempCanvas.height = canvasHeight + 150; // 범례 공간 추가
+    tempCanvas.width = Math.max(canvasWidth, 600); // 범례를 위한 최소 너비 줄임
+    tempCanvas.height = canvasHeight + 80; // 범례 공간 줄임
     
     // 원본 캔버스 내용 복사
     const originalData = canvas.toDataURL();
@@ -1308,60 +1299,60 @@ export default function App() {
       
       // 범례 배경
       tempCtx.fillStyle = '#ffffff';
-      tempCtx.fillRect(0, canvasHeight, tempCanvas.width, 150);
+      tempCtx.fillRect(0, canvasHeight, tempCanvas.width, 80);
       tempCtx.strokeStyle = '#333333';
-      tempCtx.lineWidth = 2;
-      tempCtx.strokeRect(0, canvasHeight, tempCanvas.width, 150);
+      tempCtx.lineWidth = 1;
+      tempCtx.strokeRect(0, canvasHeight, tempCanvas.width, 80);
       
       // 범례 제목
       tempCtx.fillStyle = '#000000';
-      tempCtx.font = 'bold 16px Arial';
-      tempCtx.fillText('범례 (Legend)', 20, canvasHeight + 25);
+      tempCtx.font = 'bold 12px Arial';
+      tempCtx.fillText('범례 (Legend)', 15, canvasHeight + 18);
       
-      // 범례 항목들 (벽 위주로 수정)
+      // 범례 항목들 (크기와 간격 조정)
       const legendItems = [
-        { color: '#888888', text: '벽', x: 20, y: canvasHeight + 45 },
-        { color: '#ffffff', text: '문', x: 120, y: canvasHeight + 45, hasStroke: true },
-        { color: 'transparent', text: '창문 (점선)', x: 220, y: canvasHeight + 45, isWindow: true },
-        { color: '#4CAF50', text: '벽면콘센트', x: 350, y: canvasHeight + 45 },
-        { color: '#9C27B0', text: '멀티탭', x: 480, y: canvasHeight + 45 },
-        { color: '#000000', text: '차단기함', x: 580, y: canvasHeight + 45 },
-        { color: '#0066cc', text: '전선', x: 20, y: canvasHeight + 75 },
-        { color: '#ff0000', text: '용융흔 (X)', x: 120, y: canvasHeight + 75 },
-        { color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', x: 220, y: canvasHeight + 75 },
-        { color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', x: 340, y: canvasHeight + 75 },
-        { color: '#FFEB3B', text: '증거물', x: 460, y: canvasHeight + 75 },
+        { color: '#888888', text: '벽', x: 15, y: canvasHeight + 35 },
+        { color: '#ffffff', text: '문', x: 80, y: canvasHeight + 35, hasStroke: true },
+        { color: 'transparent', text: '창문', x: 130, y: canvasHeight + 35, isWindow: true },
+        { color: '#4CAF50', text: '콘센트', x: 190, y: canvasHeight + 35 },
+        { color: '#9C27B0', text: '멀티탭', x: 250, y: canvasHeight + 35 },
+        { color: '#000000', text: '차단기함', x: 310, y: canvasHeight + 35 },
+        { color: '#0066cc', text: '전선', x: 15, y: canvasHeight + 55 },
+        { color: '#ff0000', text: '용융흔', x: 70, y: canvasHeight + 55 },
+        { color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', x: 130, y: canvasHeight + 55 },
+        { color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', x: 190, y: canvasHeight + 55 },
+        { color: '#FFEB3B', text: '증거물', x: 260, y: canvasHeight + 55 },
       ];
       
       legendItems.forEach(item => {
-        // 색상 박스 그리기
+        // 색상 박스 그리기 (크기 줄임)
         if (item.isWindow) {
           // 창문은 점선으로
           tempCtx.strokeStyle = '#666666';
-          tempCtx.setLineDash([3, 3]);
-          tempCtx.strokeRect(item.x, item.y - 10, 15, 10);
+          tempCtx.setLineDash([2, 2]);
+          tempCtx.strokeRect(item.x, item.y - 8, 10, 8);
           tempCtx.setLineDash([]);
         } else {
           tempCtx.fillStyle = item.color;
-          tempCtx.fillRect(item.x, item.y - 10, 15, 10);
+          tempCtx.fillRect(item.x, item.y - 8, 10, 8);
           if (item.hasStroke) {
             tempCtx.strokeStyle = item.strokeColor || '#000000';
-            tempCtx.strokeRect(item.x, item.y - 10, 15, 10);
+            tempCtx.strokeRect(item.x, item.y - 8, 10, 8);
           }
         }
         
-        // 텍스트
+        // 텍스트 (폰트 크기 줄임)
         tempCtx.fillStyle = '#000000';
-        tempCtx.font = '12px Arial';
-        tempCtx.fillText(item.text, item.x + 20, item.y);
+        tempCtx.font = '9px Arial';
+        tempCtx.fillText(item.text, item.x + 14, item.y);
       });
       
-      // 저장 정보
-      tempCtx.font = '10px Arial';
+      // 저장 정보 (폰트 크기와 위치 조정)
+      tempCtx.font = '8px Arial';
       tempCtx.fillStyle = '#666666';
       const date = new Date().toLocaleString('ko-KR');
-      tempCtx.fillText(`생성일시: ${date}`, 20, canvasHeight + 130);
-      tempCtx.fillText(`화재조사 평면도 - 캔버스 크기: ${canvasWidth}×${canvasHeight}`, 20, canvasHeight + 110);
+      tempCtx.fillText(`생성일시: ${date}`, 15, canvasHeight + 75);
+      tempCtx.fillText(`화재조사 평면도 - 캔버스 크기: ${canvasWidth}×${canvasHeight}`, 200, canvasHeight + 75);
       
       // 다운로드
       const dataURL = tempCanvas.toDataURL('png', 1);
@@ -1490,10 +1481,82 @@ export default function App() {
           }} 
         />
       </div>
-      <div style={{ marginTop: 8, fontSize: isMobile ? '8px' : '10px', color: '#666', lineHeight: '1.4', padding: '0 8px' }}>
-        💡 **방 그리기**: 🏠 방 버튼 클릭 후 드래그하여 벽 4개로 구성된 방 생성 | **문/창문**: 벽을 클릭 후 드래그하여 생성<br/>
-        🔧 **스마트 방향**: 수직벽(90°)에는 세로 문/창문, 수평벽(0°)에는 가로 문/창문 자동 적용 | 📏 **보조선**: 드래그 중 수직/수평선 표시<br/>
-        🔥 **피해면적**: 페인트 브러시로 자유롭게 칠하기 | 각 레이어별 체크박스로 표시/숨김 가능
+      
+      {/* 객체 미세 이동 버튼들 */}
+      <div style={{ 
+        marginTop: 12, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        gap: '4px' 
+      }}>
+        <div style={{ fontSize: isMobile ? '12px' : '14px', fontWeight: 'bold', marginBottom: '8px' }}>
+          선택된 객체 미세 이동
+        </div>
+        
+        {/* 위쪽 버튼 */}
+        <button 
+          onClick={() => moveSelectedObject('up')}
+          style={{ 
+            padding: '6px 12px', 
+            background: '#2196F3', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            fontSize: isMobile ? '12px' : '14px',
+            cursor: 'pointer'
+          }}
+        >
+          ↑ 위
+        </button>
+        
+        {/* 좌우 버튼 */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button 
+            onClick={() => moveSelectedObject('left')}
+            style={{ 
+              padding: '6px 12px', 
+              background: '#2196F3', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px',
+              fontSize: isMobile ? '12px' : '14px',
+              cursor: 'pointer'
+            }}
+          >
+            ← 왼쪽
+          </button>
+          <button 
+            onClick={() => moveSelectedObject('right')}
+            style={{ 
+              padding: '6px 12px', 
+              background: '#2196F3', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px',
+              fontSize: isMobile ? '12px' : '14px',
+              cursor: 'pointer'
+            }}
+          >
+            오른쪽 →
+          </button>
+        </div>
+        
+        {/* 아래쪽 버튼 */}
+        <button 
+          onClick={() => moveSelectedObject('down')}
+          style={{ 
+            padding: '6px 12px', 
+            background: '#2196F3', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            fontSize: isMobile ? '12px' : '14px',
+            cursor: 'pointer'
+          }}
+        >
+          ↓ 아래
+        </button>
       </div>
       {debugInfo && (
         <div style={{ 
