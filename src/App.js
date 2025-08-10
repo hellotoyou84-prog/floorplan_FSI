@@ -1432,12 +1432,12 @@ export default function App() {
       tempCtx.fillStyle = '#ffffff';
       tempCtx.fillRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, 100 * scaleFactor);
       tempCtx.strokeStyle = '#333333';
-      tempCtx.lineWidth = 1;
+      tempCtx.lineWidth = 1 * scaleFactor;
       tempCtx.strokeRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, 100 * scaleFactor);
       
       // 범례 제목
       tempCtx.fillStyle = '#000000';
-      tempCtx.font = 'bold ${12 * scaleFactor}px Arial';
+      tempCtx.font = `bold ${12 * scaleFactor}px Arial`;
       tempCtx.fillText(`범례 (Legend) - 생성일시: ${date}`, 15 * scaleFactor, (canvasHeight + 18) * scaleFactor);
       
       // 캔버스 너비에 따라 범례 항목 배치 조정
@@ -1484,7 +1484,7 @@ export default function App() {
         
         // 텍스트
         tempCtx.fillStyle = '#000000';
-        tempCtx.font = '${12 * scaleFactor}px Arial';
+        tempCtx.font = `${12 * scaleFactor}px Arial`;
         tempCtx.fillText(item.text, (x + 16) * scaleFactor, y);
       });
       
