@@ -1408,7 +1408,7 @@ export default function App() {
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     tempCanvas.width = canvasWidth; // 캔버스 크기에 맞춤
-    tempCanvas.height = canvasHeight + 80; // 범례 공간
+    tempCanvas.height = canvasHeight + 100; // 범례 공간
     
     // 원본 캔버스 내용 복사
     const originalData = canvas.toDataURL();
@@ -1418,20 +1418,23 @@ export default function App() {
       // 원본 캔버스 그리기
       tempCtx.drawImage(img, 0, 0);
       
+      // 날짜 변수 선언 (함수 시작 부분에 한 번만)
+      const date = new Date().toLocaleString('ko-KR');
+
       // 범례 배경 (캔버스 너비에 맞춤)
       tempCtx.fillStyle = '#ffffff';
-      tempCtx.fillRect(0, canvasHeight, canvasWidth, 80);
+      tempCtx.fillRect(0, canvasHeight, canvasWidth, 100);
       tempCtx.strokeStyle = '#333333';
       tempCtx.lineWidth = 1;
-      tempCtx.strokeRect(0, canvasHeight, canvasWidth, 80);
+      tempCtx.strokeRect(0, canvasHeight, canvasWidth, 100);
       
       // 범례 제목
       tempCtx.fillStyle = '#000000';
       tempCtx.font = 'bold 12px Arial';
-      tempCtx.fillText('범례 (Legend)', 15, canvasHeight + 18);
+      tempCtx.fillText(`범례 (Legend) - 생성일시: ${date}`, 15, canvasHeight + 18);
       
       // 캔버스 너비에 따라 범례 항목 배치 조정
-      const itemWidth = Math.max(50, canvasWidth / 12); // 항목당 최소 50px, 최대 캔버스너비/12
+      const itemWidth = Math.max(60, canvasWidth / 5); // 항목당 최소 50px, 최대 캔버스너비/12
       
       const legendItems = [
         { color: '#888888', text: '벽', index: 0 },
@@ -1441,15 +1444,15 @@ export default function App() {
         { color: '#9C27B0', text: '멀티탭', index: 4 },
         { color: '#000000', text: '차단기함', index: 5 },
         { color: '#0066cc', text: '전선', index: 6 },
-        { color: '#ff0000', text: '용융흔', index: 7 },
+        { color: '#ff0000', text: '용융흔(X)', index: 7 },
         { color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', index: 8 },
         { color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', index: 9 },
         { color: '#FFEB3B', text: '증거물', index: 10 },
       ];
       
       legendItems.forEach(item => {
-        const row = Math.floor(item.index / 6); // 6개씩 2줄로 배치
-        const col = item.index % 6;
+        const row = Math.floor(item.index / 4); // 6개씩 2줄로 배치
+        const col = item.index % 4;
         const x = 15 + col * itemWidth;
         const y = canvasHeight + 35 + row * 20;
         
@@ -1461,31 +1464,22 @@ export default function App() {
           // 창문은 점선으로
           tempCtx.strokeStyle = '#666666';
           tempCtx.setLineDash([2, 2]);
-          tempCtx.strokeRect(x, y - 8, 10, 8);
+          tempCtx.strokeRect(x, y - 8, 12, 10);
           tempCtx.setLineDash([]);
         } else {
           tempCtx.fillStyle = item.color;
-          tempCtx.fillRect(x, y - 8, 10, 8);
+          tempCtx.fillRect(x, y - 8, 12, 10);
           if (item.hasStroke) {
             tempCtx.strokeStyle = item.strokeColor || '#000000';
-            tempCtx.strokeRect(x, y - 8, 10, 8);
+            tempCtx.strokeRect(x, y - 8, 12, 10);
           }
         }
         
         // 텍스트
         tempCtx.fillStyle = '#000000';
-        tempCtx.font = '8px Arial';
-        tempCtx.fillText(item.text, x + 14, y);
+        tempCtx.font = '12px Arial';
+        tempCtx.fillText(item.text, x + 16, y);
       });
-      
-      // 저장 정보
-      tempCtx.font = '8px Arial';
-      tempCtx.fillStyle = '#666666';
-      const date = new Date().toLocaleString('ko-KR');
-      tempCtx.fillText(`생성일시: ${date}`, 15, canvasHeight + 75);
-      if (canvasWidth > 300) {
-        tempCtx.fillText(`화재조사 평면도 - 캔버스 크기: ${canvasWidth}×${canvasHeight}`, Math.min(200, canvasWidth - 180), canvasHeight + 75);
-      }
       
       // 다운로드
       const dataURL = tempCanvas.toDataURL('png', 1);
