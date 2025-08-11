@@ -1406,69 +1406,112 @@ export default function App() {
     
     // 해상도 스케일 팩터 (2배 = 2x 해상도, 3배 = 3x 해상도)
     const scaleFactor = 4; // 이 값을 2, 3, 4 등으로 조정하여 해상도 변경
+    
+    // 현재 캔버스에 존재하는 객체 타입 확인
+    const existingTypes = new Set();
 
-    // 임시 캔버스 생성 (원본 + 범례)
+    canvas.getObjects().forEach(obj => {
+      if (obj.isGuideline) return; // 가이드라인 제외
+      
+      // 각 객체 타입 판별
+      if (obj.type === 'rect' && obj.height === 8 && !obj.carbonizedArea && !obj.sootArea) {
+        existingTypes.add('wall');
+      } else if (obj.type === 'rect' && obj.fill === '#ffffff' && obj.stroke === '#000000') {
+        existingTypes.add('door');
+      } else if (obj.type === 'rect' && obj.fill === 'transparent' && obj.strokeDashArray) {
+        existingTypes.add('window');
+      } else if (obj.type === 'rect' && obj.fill === '#4CAF50') {
+        existingTypes.add('outlet');
+      } else if (obj.type === 'rect' && obj.fill === '#9C27B0') {
+        existingTypes.add('multitap');
+      } else if (obj.type === 'rect' && obj.fill === '#000000' && obj.width === 24) {
+        existingTypes.add('breaker');
+      } else if (obj.wireElement) {
+        existingTypes.add('wire');
+      } else if (obj.type === 'group') {
+        existingTypes.add('burn');
+      } else if (obj.carbonizedArea) {
+        existingTypes.add('carbonized');
+      } else if (obj.sootArea) {
+        existingTypes.add('soot');
+      } else if (obj.type === 'rect' && obj.fill === '#FFEB3B') {
+        existingTypes.add('evidence');
+      }
+    });
+    
+    // 전체 범례 항목 정의
+    const allLegendItems = [
+      { type: 'wall', color: '#888888', text: '벽' },
+      { type: 'door', color: '#ffffff', text: '문', hasStroke: true },
+      { type: 'window', color: 'transparent', text: '창문', isWindow: true },
+      { type: 'outlet', color: '#4CAF50', text: '콘센트' },
+      { type: 'multitap', color: '#9C27B0', text: '멀티탭' },
+      { type: 'breaker', color: '#000000', text: '차단기함' },
+      { type: 'wire', color: '#0066cc', text: '전선' },
+      { type: 'burn', color: '#ff0000', text: '용융흔' },
+      { type: 'carbonized', color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적' },
+      { type: 'soot', color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해' },
+      { type: 'evidence', color: '#FFEB3B', text: '증거물' },
+    ];
+    
+    // 실제 존재하는 타입만 필터링
+    const usedLegendItems = allLegendItems.filter(item => existingTypes.has(item.type));
+    
+    // 사용된 범례가 없으면 빈 범례 표시
+    if (usedLegendItems.length === 0) {
+      usedLegendItems.push({ type: 'empty', color: '#cccccc', text: '사용된 객체 없음' });
+    }
+    
+    // 범례 높이 동적 계산 (사용된 항목 수에 따라)
+    const legendRows = Math.ceil(usedLegendItems.length / 4);
+    const legendHeight = Math.max(60, 40 + legendRows * 20);
+    
+    // 임시 캔버스 생성
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    tempCanvas.width = canvasWidth * scaleFactor; // 캔버스 크기에 맞춤
-    tempCanvas.height = (canvasHeight + 100) * scaleFactor; // 범례 공간
+    tempCanvas.width = canvasWidth * scaleFactor;
+    tempCanvas.height = (canvasHeight + legendHeight) * scaleFactor;
     
     // 고품질 렌더링 설정
     tempCtx.imageSmoothingEnabled = true;
     tempCtx.imageSmoothingQuality = 'high';
-
+    
     // 원본 캔버스 내용 복사
     const originalData = canvas.toDataURL();
     const img = new Image();
     
     img.onload = () => {
-      // 원본 캔버스 그리기
+      // 원본 캔버스를 스케일업해서 그리기
       tempCtx.drawImage(img, 0, 0, canvasWidth * scaleFactor, canvasHeight * scaleFactor);
       
-      // 날짜 변수 선언 (함수 시작 부분에 한 번만)
+      // 날짜 변수 선언
       const date = new Date().toLocaleString('ko-KR');
-
-      // 범례 배경 (캔버스 너비에 맞춤)
+      
+      // 범례 배경
       tempCtx.fillStyle = '#ffffff';
-      tempCtx.fillRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, 100 * scaleFactor);
+      tempCtx.fillRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, legendHeight * scaleFactor);
       tempCtx.strokeStyle = '#333333';
       tempCtx.lineWidth = 1 * scaleFactor;
-      tempCtx.strokeRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, 100 * scaleFactor);
+      tempCtx.strokeRect(0, canvasHeight * scaleFactor, canvasWidth * scaleFactor, legendHeight * scaleFactor);
       
-      // 범례 제목
+      // 범례 제목과 생성일시
       tempCtx.fillStyle = '#000000';
       tempCtx.font = `bold ${12 * scaleFactor}px Arial`;
-      tempCtx.fillText(`범례 (Legend) - 생성일시: ${date}`, 15 * scaleFactor, (canvasHeight + 18) * scaleFactor);
+      tempCtx.fillText(`범례 (사용된 객체 ${usedLegendItems.length}개) - 생성일시: ${date}`, 15 * scaleFactor, (canvasHeight + 18) * scaleFactor);
       
-      // 캔버스 너비에 따라 범례 항목 배치 조정
-      const itemWidth = Math.max(60, canvasWidth / 5) * scaleFactor; // 항목당 최소 50px, 최대 캔버스너비/12
+      // 사용된 범례 항목들만 배치
+      const itemWidth = Math.max(60, canvasWidth / 5) * scaleFactor;
       
-      const legendItems = [
-        { color: '#888888', text: '벽', index: 0 },
-        { color: '#ffffff', text: '문', index: 1, hasStroke: true },
-        { color: 'transparent', text: '창문', index: 2, isWindow: true },
-        { color: '#4CAF50', text: '콘센트', index: 3 },
-        { color: '#9C27B0', text: '멀티탭', index: 4 },
-        { color: '#000000', text: '차단기함', index: 5 },
-        { color: '#0066cc', text: '전선', index: 6 },
-        { color: '#ff0000', text: '용융흔(X)', index: 7 },
-        { color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', index: 8 },
-        { color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', index: 9 },
-        { color: '#FFEB3B', text: '증거물', index: 10 },
-      ];
-      
-      legendItems.forEach(item => {
-        const row = Math.floor(item.index / 4); // 6개씩 2줄로 배치
-        const col = item.index % 4;
+      usedLegendItems.forEach((item, index) => {
+        const row = Math.floor(index / 4);
+        const col = index % 4;
         const x = (15 + col * (itemWidth / scaleFactor)) * scaleFactor;
         const y = (canvasHeight + 35 + row * 20) * scaleFactor;
         
-        // 텍스트가 캔버스를 벗어나지 않도록 체크
         if (x + itemWidth > canvasWidth * scaleFactor - 10 * scaleFactor) return;
         
         // 색상 박스 그리기
         if (item.isWindow) {
-          // 창문은 점선으로
           tempCtx.strokeStyle = '#666666';
           tempCtx.setLineDash([2 * scaleFactor, 2 * scaleFactor]);
           tempCtx.strokeRect(x, y - 8 * scaleFactor, 12 * scaleFactor, 10 * scaleFactor);
@@ -1488,7 +1531,7 @@ export default function App() {
         tempCtx.fillText(item.text, x + 16 * scaleFactor, y);
       });
       
-      // 다운로드
+      // 고품질 PNG로 다운로드
       const dataURL = tempCanvas.toDataURL('image/png', 1.0);
       const link = document.createElement('a');
       link.download = `화재조사_평면도_${new Date().toISOString().slice(0, 10)}.png`;
@@ -1497,7 +1540,7 @@ export default function App() {
       link.click();
       document.body.removeChild(link);
       
-      setDebugInfo("평면도가 범례와 함께 저장되었습니다");
+      setDebugInfo(`${usedLegendItems.length}개 사용된 범례와 함께 저장되었습니다`);
     };
     
     img.src = originalData;
