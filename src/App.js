@@ -1358,7 +1358,8 @@ export default function App() {
         return selectedFurniture 
           ? `🪑 ${selectedFurniture} 배치 모드: 드래그하여 크기를 조절하며 배치하세요`
           : '🪑 가구 모드: 배치할 가구를 선택하세요';
-      default: return '↔️ 선택 모드: 객체를 선택하고 이동하세요 (범례 클릭으로 타입별 순환 선택)';
+      default: 
+        return '↔️ 선택 모드: 객체를 선택하고 이동하세요 (범례 클릭으로 타입별 순환 선택)';
     }
   };
 
@@ -1408,6 +1409,8 @@ export default function App() {
         break;
       case 'right':
         newLeft += moveDistance;
+        break;
+      default:
         break;
     }
     
@@ -1492,6 +1495,8 @@ export default function App() {
               targetObjects.push(obj);
             }
           }
+          break;
+        default:
           break;  
       }
     });
