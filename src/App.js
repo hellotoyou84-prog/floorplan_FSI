@@ -12,6 +12,8 @@ export default function App() {
   const [showCarbonized, setShowCarbonized] = useState(true); // 탄화면적 표시/숨김
   const [showSoot, setShowSoot] = useState(true); // 그을음피해 표시/숨김
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [showFurnitureMenu, setShowFurnitureMenu] = useState(false);
+  const [selectedFurniture, setSelectedFurniture] = useState(null);
 
   // Canvas 초기화
   useEffect(() => {
@@ -400,6 +402,113 @@ export default function App() {
         line = null;
       });
     }
+
+    // 가구 추가 모드
+    if (mode === "furniture" && selectedFurniture) {
+      canvas.selection = false;
+      canvas.getObjects().forEach(obj => obj.set({ selectable: false, evented: false }));
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+      
+      let drawing = false;
+      let startPos = null;
+      let tempFurniture = null;
+      
+      const furnitureStyles = {
+        '소파': { color: '#8B4513', label: '소파' },
+        '냉장고': { color: '#C0C0C0', label: '냉장고' },
+        'TV': { color: '#000000', label: 'TV' },
+        '침대': { color: '#D2691E', label: '침대' },
+        '테이블': { color: '#A0522D', label: '테이블' },
+        '세탁기': { color: '#B0B0B0', label: '세탁기' }
+      };
+      
+      const style = furnitureStyles[selectedFurniture];
+      
+      canvas.on("mouse:down", ({ e }) => {
+        const { x, y } = canvas.getPointer(e);
+        drawing = true;
+        startPos = { x, y };
+        
+        tempFurniture = new fabric.Rect({
+          left: x,
+          top: y,
+          width: 40,
+          height: 40,
+          fill: style.color,
+          stroke: '#333333',
+          strokeWidth: 2,
+          rx: 3,
+          ry: 3,
+          selectable: false,
+          evented: false,
+          originX: 'left',
+          originY: 'top',
+          furnitureType: selectedFurniture,
+        });
+        
+        canvas.add(tempFurniture);
+        canvas.renderAll();
+      });
+      
+      canvas.on("mouse:move", ({ e }) => {
+        if (!drawing || !tempFurniture) return;
+        
+        const { x, y } = canvas.getPointer(e);
+        const width = Math.abs(x - startPos.x);
+        const height = Math.abs(y - startPos.y);
+        
+        const minSize = 20;
+        const maxSize = 200;
+        
+        const finalWidth = Math.min(Math.max(width, minSize), maxSize);
+        const finalHeight = Math.min(Math.max(height, minSize), maxSize);
+        
+        tempFurniture.set({
+          left: Math.min(startPos.x, x),
+          top: Math.min(startPos.y, y),
+          width: finalWidth,
+          height: finalHeight
+        });
+        
+        canvas.renderAll();
+      });
+      
+      canvas.on("mouse:up", () => {
+        if (!drawing || !tempFurniture) return;
+        
+        drawing = false;
+        
+        const text = new fabric.Text(style.label, {
+          left: tempFurniture.left + tempFurniture.width / 2,
+          top: tempFurniture.top + tempFurniture.height / 2,
+          fontSize: Math.min(tempFurniture.width, tempFurniture.height) / 4,
+          fill: '#FFFFFF',
+          originX: 'center',
+          originY: 'center',
+          selectable: false,
+          evented: false,
+        });
+        
+        const furnitureGroup = new fabric.Group([tempFurniture, text], {
+          left: tempFurniture.left,
+          top: tempFurniture.top,
+          selectable: true,
+          evented: true,
+          furnitureType: selectedFurniture,
+        });
+        
+        canvas.remove(tempFurniture);
+        canvas.add(furnitureGroup);
+        canvas.renderAll();
+        
+        setDebugInfo(`${selectedFurniture} 추가됨 (${tempFurniture.width.toFixed(0)}×${tempFurniture.height.toFixed(0)})`);
+        
+        startPos = null;
+        tempFurniture = null;
+      });
+    }
+
     // 방 그리기 (벽 4개로 구성) - 수정된 기능
     else if (mode === "room") {
       canvas.selection = false;
@@ -1119,6 +1228,24 @@ export default function App() {
         setDebugInfo("증거물 추가됨 (노란색)");
       });
     }
+    
+    else if (mode === "") {
+      canvas.selection = true;
+      canvas.isDrawingMode = false;
+      canvas.off('path:created');
+      
+      canvas.getObjects().forEach(obj => {
+        obj.set({
+          selectable: true,
+          evented: true,
+          lockScalingX: true,
+          lockScalingY: true,
+          lockRotation: true,
+        });
+      });
+      canvas.requestRenderAll();
+    }
+
     // 선택 모드 (개선된 객체 선택 로직)
     else {
       canvas.selection = true;
@@ -1207,7 +1334,9 @@ export default function App() {
         }
       });
     }
-  }, [mode, axisLock, showWires, showCarbonized, showSoot, findSnapPoint, getWallOrientation, getRoomSideDirection, showGuidelines]);
+
+        
+  }, [mode, axisLock, showWires, showCarbonized, showSoot, findSnapPoint, getWallOrientation, getRoomSideDirection, showGuidelines, selectedFurniture]);
 
   // 현재 모드에 따른 설명 텍스트
   const getModeDescription = () => {
@@ -1224,6 +1353,11 @@ export default function App() {
       case 'carbonized': return '🔥 탄화면적 모드: 브러시로 탄화면적을 칠하세요';
       case 'soot': return '💨 그을음피해 모드: 브러시로 그을음피해를 칠하세요';
       case 'evidence': return '📋 증거물 모드: 클릭하여 증거물을 추가하세요';
+      case 'deleteSelected': return '🗑️ 삭제 모드: 선택된 객체를 삭제하세요';
+      case 'furniture': 
+        return selectedFurniture 
+          ? `🪑 ${selectedFurniture} 배치 모드: 드래그하여 크기를 조절하며 배치하세요`
+          : '🪑 가구 모드: 배치할 가구를 선택하세요';
       default: return '↔️ 선택 모드: 객체를 선택하고 이동하세요 (범례 클릭으로 타입별 순환 선택)';
     }
   };
@@ -1333,7 +1467,7 @@ export default function App() {
           }
           break;
         case 'burn':
-          if (obj.type === 'group') {
+          if (obj.type === 'group' && !obj.furnitureType) {
             targetObjects.push(obj);
           }
           break;
@@ -1352,6 +1486,13 @@ export default function App() {
             targetObjects.push(obj);
           }
           break;
+        case 'furniture':
+          if (type === 'furniture') {
+            if (obj.furnitureType || (obj.type === 'group' && obj._objects && obj._objects[0] && obj._objects[0].furnitureType)) {
+              targetObjects.push(obj);
+            }
+          }
+          break;  
       }
     });
     
@@ -1437,6 +1578,11 @@ export default function App() {
       } else if (obj.type === 'rect' && obj.fill === '#FFEB3B') {
         existingTypes.add('evidence');
       }
+
+      if (obj.furnitureType || (obj.type === 'group' && obj._objects && obj._objects[0] && obj._objects[0].furnitureType)) {
+        existingTypes.add('furniture');
+      }
+
     });
     
     // 전체 범례 항목 정의
@@ -1452,6 +1598,7 @@ export default function App() {
       { type: 'carbonized', color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적' },
       { type: 'soot', color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해' },
       { type: 'evidence', color: '#FFEB3B', text: '증거물' },
+      { type: 'furniture', color: '#795548', text: '가구' },
     ];
     
     // 실제 존재하는 타입만 필터링
@@ -1589,10 +1736,60 @@ export default function App() {
           <button onClick={() => setMode('room')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'room' ? '#3498db' : '#ddd', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto', color: mode === 'room' ? 'white' : 'black' }}>🏠 방</button>
           <button onClick={() => setMode('door')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'door' ? '#4CAF50' : '#ddd', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>🚪 문</button>
           <button onClick={() => setMode('window')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'window' ? '#2196F3' : '#ddd', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>🪟 창문</button>
-          <button onClick={() => setMode('')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === '' ? '#bbb' : '#eee', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>↔️ 선택</button>
-          <button onClick={deleteSelected} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: '#ff4444', color: 'white', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>🗑️ 삭제</button>
+          <button 
+            onClick={() => {
+              setMode('furniture');
+              setShowFurnitureMenu(!showFurnitureMenu);
+            }} 
+            style={{ 
+              padding: isMobile ? '4px 8px' : '6px 10px', 
+              background: mode === 'furniture' ? '#795548' : '#ddd', 
+              color: mode === 'furniture' ? 'white' : 'black',
+              fontSize: isMobile ? '10px' : '12px', 
+              minWidth: isMobile ? '60px' : 'auto' 
+            }}
+          >
+            🪑 가구
+          </button>
         </div>
         
+        {showFurnitureMenu && mode === 'furniture' && (
+          <div style={{ 
+            marginBottom: isMobile ? 4 : 8, 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            justifyContent: 'center', 
+            gap: '4px',
+            padding: '8px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '4px',
+            border: '1px solid #ddd'
+          }}>
+            {['소파', '냉장고', 'TV', '침대', '테이블', '세탁기'].map(furniture => (
+              <button
+                key={furniture}
+                onClick={() => {
+                  setSelectedFurniture(furniture);
+                  setDebugInfo(`${furniture} 선택됨 - 캔버스에 드래그하여 배치하세요`);
+                }}
+                style={{
+                  padding: isMobile ? '4px 8px' : '6px 10px',
+                  background: selectedFurniture === furniture ? '#795548' : '#fff',
+                  color: selectedFurniture === furniture ? 'white' : 'black',
+                  border: '1px solid #999',
+                  borderRadius: '4px',
+                  fontSize: isMobile ? '10px' : '11px',
+                  minWidth: isMobile ? '50px' : '60px',
+                  cursor: 'pointer'
+                }}
+              >
+                {furniture}
+              </button>
+            ))}
+          </div>
+        )}
+        </div>
+
         {/* 두 번째 줄: 전기 관련 도구들 */}
         <div style={{ marginBottom: isMobile ? 4 : 8, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px' }}>
           <button onClick={() => setMode('outlet')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'outlet' ? '#2196F3' : '#ddd', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '70px' : 'auto' }}>🔌 콘센트</button>
@@ -1600,7 +1797,7 @@ export default function App() {
           <button onClick={() => setMode('breaker')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'breaker' ? '#333333' : '#ddd', color: mode === 'breaker' ? 'white' : 'black', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '70px' : 'auto' }}>⚡ 차단기함</button>
           <button onClick={() => setMode('wire')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'wire' ? '#607D8B' : '#ddd', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>⚡ 전선</button>
         </div>
-        
+           
         {/* 세 번째 줄: 화재 관련 */}
         <div style={{ marginBottom: isMobile ? 4 : 8, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px' }}>
           <button onClick={() => setMode('burn')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === 'burn' ? '#FF5722' : '#ddd', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>❌ 용융흔</button>
@@ -1623,7 +1820,13 @@ export default function App() {
           <label style={{ fontSize: isMobile ? '10px' : '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <input type='checkbox' checked={showSoot} onChange={() => setShowSoot(v => !v)} style={{ transform: isMobile ? 'scale(0.8)' : 'scale(1)' }} /> 그을음피해
           </label>
+
+        <div style={{ marginBottom: isMobile ? 4 : 8, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '4px' }}>
+          <button onClick={() => setMode('')} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: mode === '' ? '#bbb' : '#eee', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>↔️ 선택</button>
+          
+          <button onClick={deleteSelected} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: '#ff4444', color: 'white', fontSize: isMobile ? '10px' : '12px', minWidth: isMobile ? '60px' : 'auto' }}>🗑️ 삭제</button>
           <button onClick={saveProject} style={{ padding: isMobile ? '4px 8px' : '6px 10px', background: '#4CAF50', color: 'white', fontSize: isMobile ? '10px' : '11px' }}>💾 저장</button>
+        
         </div>
       </div>
       
@@ -1690,6 +1893,7 @@ export default function App() {
             gap: '4px',
             fontSize: isMobile ? '9px' : '10px'
           }}>
+
             {[
               { type: 'wall', color: '#888888', text: '벽', onClick: () => selectObjectsByType('wall') },
               { type: 'door', color: '#ffffff', text: '문', hasStroke: true, onClick: () => selectObjectsByType('door') },
@@ -1702,6 +1906,7 @@ export default function App() {
               { type: 'carbonized', color: 'rgba(204, 0, 0, 0.7)', text: '탄화면적', onClick: () => selectObjectsByType('carbonized') },
               { type: 'soot', color: 'rgba(255, 99, 99, 0.3)', text: '그을음피해', onClick: () => selectObjectsByType('soot') },
               { type: 'evidence', color: '#FFEB3B', text: '증거물', onClick: () => selectObjectsByType('evidence') },
+              { type: 'furniture', color: '#795548', text: '가구', onClick: () => selectObjectsByType('furniture') },
             ].map((item, index) => (
               <button
                 key={index}
