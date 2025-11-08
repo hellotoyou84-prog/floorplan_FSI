@@ -29,6 +29,7 @@ export default function App() {
       targetFindTolerance: 5, // 선택 허용 범위 확대 (특히 작은 객체용)
       perPixelTargetFind: true, // 픽셀 단위 정확한 선택
     });
+    
     canvasObj.current = canvas;
 
     // Delete/Backspace로 삭제
@@ -482,7 +483,7 @@ export default function App() {
         const text = new fabric.Text(style.label, {
           left: tempFurniture.left + tempFurniture.width / 2,
           top: tempFurniture.top + tempFurniture.height / 2,
-          fontSize: Math.min(tempFurniture.width, tempFurniture.height) / 4,
+          fontSize: Math.max(12, Math.min(tempFurniture.width, tempFurniture.height) / 3),
           fill: '#FFFFFF',
           originX: 'center',
           originY: 'center',
@@ -1551,7 +1552,7 @@ export default function App() {
     const canvasHeight = canvas.height;
     
     // 해상도 스케일 팩터 (2배 = 2x 해상도, 3배 = 3x 해상도)
-    const scaleFactor = 4; // 이 값을 2, 3, 4 등으로 조정하여 해상도 변경
+    const scaleFactor = 8; // 이 값을 2, 3, 4 등으로 조정하여 해상도 변경
     
     // 현재 캔버스에 존재하는 객체 타입 확인
     const existingTypes = new Set();
@@ -1629,7 +1630,11 @@ export default function App() {
     tempCtx.imageSmoothingQuality = 'high';
     
     // 원본 캔버스 내용 복사
-    const originalData = canvas.toDataURL();
+    const originalData = canvas.toDataURL({
+      format: 'png',
+      quality: 1,
+      multiplier: scaleFactor
+    });
     const img = new Image();
     
     img.onload = () => {
